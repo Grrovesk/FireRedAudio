@@ -35,7 +35,6 @@ from dataclasses import dataclass
 
 import numpy as np
 import torch
-import torchaudio
 
 from transformers import AutoTokenizer, GenerationConfig
 
@@ -50,6 +49,7 @@ from fireredaudio.utils.audio import (
     GENERATION_SAMPLE_RATE,
     UNDERSTAND_SAMPLE_RATE,
     read_audio,
+    save_audio,
 )
 from fireredaudio.redae.decoder import (
     PretrainedRedAEAudioDecoderV1,
@@ -266,6 +266,7 @@ class FireRedAudioInference:
         processor_path: str | None = None,
         vae_decoder_path: str | None = None,
         device: str = "cuda:0",
+        quantization: str | None = None,
     ):
         self.device = torch.device(device)
         if self.device.type == "cuda":
@@ -276,7 +277,9 @@ class FireRedAudioInference:
         # so every mutation to a shared object is visible in one place.
         self.tokenizer.padding_side = "left"
         self.processor = FireRedAudioProcessor.from_pretrained(processor_path or model_path)
-        self.model = load_fireredaudio(model_path, device=self.device)
+        self.model = load_fireredaudio(
+            model_path, device=self.device, quantization=quantization
+        )
 
         self.encoder = AudioPromptEncoder(
             tokenizer=self.tokenizer,
@@ -533,6 +536,9 @@ def parse_args():
     p.add_argument("--vae-decoder", default=None,
                    help="RedAE weights (.pt); required for tts / edit / voice_design")
     p.add_argument("--device", default="cuda:0", help="e.g. cuda:0, cuda:1, cpu")
+    p.add_argument("--quantization", choices=["int4"], default=None,
+                   help="quantize supported linear layers; requires the optional "
+                        "quantization dependencies and CUDA")
     p.add_argument("--seed", type=int, default=None, help="left unseeded when omitted")
     p.add_argument("--output", default=None,
                    help="txt for understanding tasks (printed as well if omitted); "
@@ -609,6 +615,7 @@ def main():
         processor_path=args.processor,
         vae_decoder_path=args.vae_decoder,
         device=args.device,
+        quantization=args.quantization,
     )
 
     if args.task in UNDERSTAND_TASKS:
@@ -655,7 +662,7 @@ def main():
         print("===== text output =====")
         print(result.text)
     out = args.output or f"{args.task}.wav"
-    torchaudio.save(out, result.audio.cpu().float(), sample_rate=GENERATION_SAMPLE_RATE)
+    save_audio(out, result.audio, sample_rate=GENERATION_SAMPLE_RATE)
     logger.info("wrote audio to %s (%.2fs)", out,
                 result.audio.shape[-1] / GENERATION_SAMPLE_RATE)
 
