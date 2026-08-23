@@ -75,6 +75,30 @@ uv run inference.py --task asr --model pretrained_models/FireRedAudio \
 `int4` uses bitsandbytes NF4 and requires a supported CUDA GPU. Validate ASR and
 understanding quality before using quantization for TTS or speech editing.
 
+### Export a local int4 model
+
+To materialize the quantized weights as local safetensors shards, run the
+export script on a CUDA machine:
+
+```sh
+uv sync --extra quantization
+uv run python export_int4_model.py \
+  --model pretrained_models/FireRedAudio \
+  --output pretrained_models/FireRedAudio-int4 \
+  --device cuda:0
+```
+
+The output directory contains the NF4 model shards, quantization configuration,
+tokenizer, and processor files. It can be used directly for inference:
+
+```sh
+uv run inference.py --task asr --model pretrained_models/FireRedAudio-int4 \
+  --audio assets/examples/asr_zh_fleurs.wav --quantization int4
+```
+
+The output directory must be empty or absent. The export requires enough GPU
+memory to load the original model before saving the quantized shards.
+
 ### Model Download
 
 Download the pretrained model from Hugging Face with the `hf` CLI:
@@ -168,14 +192,14 @@ uv run api_server.py
 
 默认配置如下：
 
-| 参数 | 默认值 |
-| --- | --- |
-| 模型目录 | `pretrained_models/FireRedAudio` |
+| 参数         | 默认值                                       |
+| ------------ | -------------------------------------------- |
+| 模型目录     | `pretrained_models/FireRedAudio`           |
 | RedAE 解码器 | `pretrained_models/RedAE_decoder/model.pt` |
-| 设备 | `cuda:0` |
-| 量化 | `int4` |
-| 地址 | `127.0.0.1` |
-| 端口 | `8000` |
+| 设备         | `cuda:0`                                   |
+| 量化         | `int4`                                     |
+| 地址         | `127.0.0.1`                                |
+| 端口         | `8000`                                     |
 
 也可以覆盖默认配置：
 
@@ -258,12 +282,12 @@ curl -X POST http://127.0.0.1:8000/v1/tts \
 
 字段说明：
 
-| 字段 | 必填 | 说明 |
-| --- | --- | --- |
-| `prompt_audio` | 是 | 参考音频文件 |
-| `prompt_text` | 是 | 参考音频对应的文本 |
-| `target_text` | 是 | 需要合成的文本 |
-| `language` | 否 | `zh` 或 `en`，默认 `zh` |
+| 字段             | 必填 | 说明                          |
+| ---------------- | ---- | ----------------------------- |
+| `prompt_audio` | 是   | 参考音频文件                  |
+| `prompt_text`  | 是   | 参考音频对应的文本            |
+| `target_text`  | 是   | 需要合成的文本                |
+| `language`     | 否   | `zh` 或 `en`，默认 `zh` |
 
 #### 语音编辑
 
@@ -459,14 +483,14 @@ curl -H "X-API-Key: your-secret-key" http://127.0.0.1:8000/health
 
 #### 接口汇总
 
-| 方法 | 路径 | 输入 | 返回 |
-| --- | --- | --- | --- |
-| GET | `/health` | 无 | JSON 状态 |
-| POST | `/v1/asr` | `audio` 文件 | JSON 文本 |
-| POST | `/v1/understand` | `audio`、`prompt` 等表单字段 | JSON 答案 |
-| POST | `/v1/tts` | 参考音频和文本 | WAV |
-| POST | `/v1/edit` | `audio`、`instruction`、`edit_type` | WAV |
-| POST | `/v1/voice-design` | `instruction`、`text` | WAV |
+| 方法 | 路径                 | 输入                                      | 返回      |
+| ---- | -------------------- | ----------------------------------------- | --------- |
+| GET  | `/health`          | 无                                        | JSON 状态 |
+| POST | `/v1/asr`          | `audio` 文件                            | JSON 文本 |
+| POST | `/v1/understand`   | `audio`、`prompt` 等表单字段          | JSON 答案 |
+| POST | `/v1/tts`          | 参考音频和文本                            | WAV       |
+| POST | `/v1/edit`         | `audio`、`instruction`、`edit_type` | WAV       |
+| POST | `/v1/voice-design` | `instruction`、`text`                 | WAV       |
 
 服务端推理使用单模型锁，同一时刻只处理一个推理请求。模型加载失败、缺少
 VAE 解码器或 GPU 显存不足时，服务端会返回 HTTP 500；客户端应检查
@@ -508,36 +532,11 @@ uv run inference.py --task voice_design --model pretrained_models/FireRedAudio -
     --text "是我请他来的，可他什么也不知道，他来只是想打听一下，你们厂是不是有旧锅炉？" --output voice_design.wav
 ```
 
-
 ## Performance
 
 ### Audio Understanding
 
 <div align="center">
-
-<table style="border-collapse:collapse; margin:0 auto; text-align:center; white-space:nowrap;">
-  <thead>
-    <tr>
-      <th align="center" style="padding:6px 14px; border:1px solid #ddd; background-color:#f5f5f5;"><div align="center">Model</div></th>
-      <th align="center" style="padding:6px 14px; border:1px solid #ddd; background-color:#f5f5f5;"><div align="center">MMAU test-mini</div></th>
-      <th align="center" style="padding:6px 14px; border:1px solid #ddd; background-color:#f5f5f5;"><div align="center">MMAU test</div></th>
-      <th align="center" style="padding:6px 14px; border:1px solid #ddd; background-color:#f5f5f5;"><div align="center">MMSU</div></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">Step-Audio-R1.1</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">77.7</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">75.9</td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">Step-Audio 2</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">78.0</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">–</td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">MiMo-Audio-7B-Instruct</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">74.9</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">61.7</td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">Kimi-Audio</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">65.2</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">–</td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">LongCat-Next</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">76.4</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">–</td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">Qwen3-Omni-30B-A3B-Instruct</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">77.5</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">69.0</td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">Gemini 3.1 Pro</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">80.7*</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">78.8*</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">82.7*</td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">Qwen3.5-Omni-Plus</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">81.4*</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">79.9*</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">80.7*</td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;"><b>FireRedAudio</b></td><td align="center" style="padding:6px 14px; border:1px solid #ddd;"><b>82.0</b></td><td align="center" style="padding:6px 14px; border:1px solid #ddd;"><b>80.9</b></td><td align="center" style="padding:6px 14px; border:1px solid #ddd;"><b>83.3</b></td></tr>
-  </tbody>
-</table>
-
-</div>
 
 * *Results marked with * are obtained from our own evaluation.*
 
@@ -545,90 +544,15 @@ uv run inference.py --task voice_design --model pretrained_models/FireRedAudio -
 
 <div align="center">
 
-<table style="border-collapse:collapse; margin:0 auto; text-align:center; white-space:nowrap;">
-  <thead>
-    <tr>
-      <th align="center" style="padding:6px 12px; border:1px solid #ddd; background-color:#f5f5f5;"><div align="center">Model</div></th>
-      <th align="center" style="padding:6px 12px; border:1px solid #ddd; background-color:#f5f5f5;"><div align="center">AISHELL&#8209;1</div></th>
-      <th align="center" style="padding:6px 12px; border:1px solid #ddd; background-color:#f5f5f5;"><div align="center">AISHELL&#8209;2<br>test&#8209;ios</div></th>
-      <th align="center" style="padding:6px 12px; border:1px solid #ddd; background-color:#f5f5f5;"><div align="center">WenetSpeech<br>Net&nbsp;&#8288;|&#8288;&nbsp;Meeting</div></th>
-      <th align="center" style="padding:6px 12px; border:1px solid #ddd; background-color:#f5f5f5;"><div align="center">LibriSpeech<br>clean&nbsp;&#8288;|&#8288;&nbsp;other</div></th>
-      <th align="center" style="padding:6px 12px; border:1px solid #ddd; background-color:#f5f5f5;"><div align="center">FLEURS<br>en&nbsp;&#8288;|&#8288;&nbsp;zh</div></th>
-      <th align="center" style="padding:6px 12px; border:1px solid #ddd; background-color:#f5f5f5;"><div align="center">FLEURS&#8209;102<br>avg</div></th>
-      <th align="center" style="padding:6px 12px; border:1px solid #ddd; background-color:#f5f5f5;"><div align="center">KeSpeech</div></th>
-      <th align="center" style="padding:6px 12px; border:1px solid #ddd; background-color:#f5f5f5;"><div align="center">Opencpop</div></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr><td align="center" style="padding:6px 12px; border:1px solid #ddd;">Step&#8209;Audio&nbsp;2</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">0.63</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">2.10</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">4.67&nbsp;&#8288;|&#8288;&nbsp;4.75</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">1.17&nbsp;&#8288;|&#8288;&nbsp;2.42</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">3.03&nbsp;&#8288;|&#8288;&nbsp;2.68</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">3.63</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td></tr>
-    <tr><td align="center" style="padding:6px 12px; border:1px solid #ddd;">MiMo&#8209;Audio&#8209;7B&#8209;Instruct</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">1.65</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">3.50&nbsp;&#8288;|&#8288;&nbsp;–</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td></tr>
-    <tr><td align="center" style="padding:6px 12px; border:1px solid #ddd;">Ming&#8209;UniAudio&#8209;16B&#8209;A3B</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">2.84</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">1.62&nbsp;&#8288;|&#8288;&nbsp;–</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td></tr>
-    <tr><td align="center" style="padding:6px 12px; border:1px solid #ddd;">Kimi&#8209;Audio</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">0.60</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">2.56</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">5.37&nbsp;&#8288;|&#8288;&nbsp;6.28</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">1.28&nbsp;&#8288;|&#8288;&nbsp;2.42</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">4.44&nbsp;&#8288;|&#8288;&nbsp;2.69</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td></tr>
-    <tr><td align="center" style="padding:6px 12px; border:1px solid #ddd;">LongCat&#8209;Next</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">1.47</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">2.82</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">5.98&nbsp;&#8288;|&#8288;&nbsp;8.19</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">1.63&nbsp;&#8288;|&#8288;&nbsp;3.42</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">5.24&nbsp;&#8288;|&#8288;&nbsp;3.24</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td></tr>
-    <tr><td align="center" style="padding:6px 12px; border:1px solid #ddd;">Qwen3&#8209;Omni&#8209;30B&#8209;A3B&#8209;Instruct</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">4.69&nbsp;&#8288;|&#8288;&nbsp;5.89</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">1.22&nbsp;&#8288;|&#8288;&nbsp;2.48</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">2.72&nbsp;&#8288;|&#8288;&nbsp;2.20</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">–</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">1.54</td></tr>
-    <tr><td align="center" style="padding:6px 12px; border:1px solid #ddd;">Gemini&nbsp;3.1&nbsp;Pro</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">3.66*</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">7.10*</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">11.53&nbsp;&#8288;|&#8288;&nbsp;14.21</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">3.36&nbsp;&#8288;|&#8288;&nbsp;4.41</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">2.97*&nbsp;&#8288;|&#8288;&nbsp;4.28*</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">18.23*</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">23.67</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">6.83</td></tr>
-    <tr><td align="center" style="padding:6px 12px; border:1px solid #ddd;">Qwen3.5&#8209;Omni&#8209;Plus</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">0.82*</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">2.26*</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">4.30&nbsp;&#8288;|&#8288;&nbsp;5.84</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">1.11&nbsp;&#8288;|&#8288;&nbsp;2.23</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">3.33*&nbsp;&#8288;|&#8288;&nbsp;2.46*</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">23.66*</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">3.46</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">1.49</td></tr>
-    <tr><td align="center" style="padding:6px 12px; border:1px solid #ddd;"><b>FireRedAudio</b></td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">0.71</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">2.63</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">5.18&nbsp;&#8288;|&#8288;&nbsp;5.33</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">0.67&nbsp;&#8288;|&#8288;&nbsp;2.91</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">2.53&nbsp;&#8288;|&#8288;&nbsp;3.14</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">14.94</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">4.82</td><td align="center" style="padding:6px 12px; border:1px solid #ddd;">1.63</td></tr>
-  </tbody>
-</table>
-
-</div>
-
 * *Results marked with * are obtained from our own evaluation.*
 
 ### Zero-Shot TTS
 
 <div align="center">
 
-<table align="center" style="border-collapse:collapse; margin:0 auto; text-align:center; white-space:nowrap;">
-  <thead>
-    <tr>
-      <th align="center" style="padding:6px 14px; border:1px solid #ddd; background-color:#f5f5f5;"><div align="center">Model</div></th>
-      <th align="center" style="padding:6px 14px; border:1px solid #ddd; background-color:#f5f5f5;"><div align="center">Seed-ZH<br>CER↓&nbsp;&#8288;|&#8288;&nbsp;SIM↑</div></th>
-      <th align="center" style="padding:6px 14px; border:1px solid #ddd; background-color:#f5f5f5;"><div align="center">Seed-EN<br>WER↓&nbsp;&#8288;|&#8288;&nbsp;SIM↑</div></th>
-      <th align="center" style="padding:6px 14px; border:1px solid #ddd; background-color:#f5f5f5;"><div align="center">Avg.<br>CER/WER↓&nbsp;&#8288;|&#8288;&nbsp;SIM↑</div></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">Seed-TTS</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">1.12&nbsp;&#8288;|&#8288;&nbsp;<b>0.80</b></td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">2.25&nbsp;&#8288;|&#8288;&nbsp;<b>0.76</b></td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">1.69&nbsp;&#8288;|&#8288;&nbsp;<b>0.78</b></td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">FireRedTTS</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">1.51&nbsp;&#8288;|&#8288;&nbsp;0.65</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">3.82&nbsp;&#8288;|&#8288;&nbsp;0.53</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">2.67&nbsp;&#8288;|&#8288;&nbsp;0.59</td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">FireRedTTS-2</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">1.14&nbsp;&#8288;|&#8288;&nbsp;0.74</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">1.95&nbsp;&#8288;|&#8288;&nbsp;0.65</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">1.55&nbsp;&#8288;|&#8288;&nbsp;0.69</td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">DiTAR (1B)</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">1.02&nbsp;&#8288;|&#8288;&nbsp;0.75</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">1.69&nbsp;&#8288;|&#8288;&nbsp;<ins>0.74</ins></td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">1.36&nbsp;&#8288;|&#8288;&nbsp;<ins>0.75</ins></td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">F5-TTS</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">1.56&nbsp;&#8288;|&#8288;&nbsp;0.74</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">1.83&nbsp;&#8288;|&#8288;&nbsp;0.65</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">1.70&nbsp;&#8288;|&#8288;&nbsp;0.70</td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">CosyVoice 2</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">1.45&nbsp;&#8288;|&#8288;&nbsp;0.75</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">2.57&nbsp;&#8288;|&#8288;&nbsp;0.65</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">2.01&nbsp;&#8288;|&#8288;&nbsp;0.70</td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">CosyVoice 3-1.5B</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">1.12&nbsp;&#8288;|&#8288;&nbsp;<ins>0.78</ins></td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">2.21&nbsp;&#8288;|&#8288;&nbsp;0.72</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">1.67&nbsp;&#8288;|&#8288;&nbsp;<ins>0.75</ins></td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">MiMo-Audio-7B-Instruct</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">1.96&nbsp;&#8288;|&#8288;&nbsp;–</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">5.37&nbsp;&#8288;|&#8288;&nbsp;–</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">3.67&nbsp;&#8288;|&#8288;&nbsp;–</td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">Qwen2.5-Omni-7B (RL)</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">1.42&nbsp;&#8288;|&#8288;&nbsp;0.75</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">2.33&nbsp;&#8288;|&#8288;&nbsp;0.64</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">1.88&nbsp;&#8288;|&#8288;&nbsp;0.70</td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">Qwen3-Omni-30B-A3B-Instruct</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">1.07&nbsp;&#8288;|&#8288;&nbsp;–</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;"><b>1.39</b>&nbsp;&#8288;|&#8288;&nbsp;–</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;"><ins>1.23</ins>&nbsp;&#8288;|&#8288;&nbsp;–</td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">Ming-UniAudio-16B-A3B</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;"><ins>0.95</ins>&nbsp;&#8288;|&#8288;&nbsp;0.70</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">1.85&nbsp;&#8288;|&#8288;&nbsp;0.58</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">1.40&nbsp;&#8288;|&#8288;&nbsp;0.64</td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;"><b>FireRedAudio</b></td><td align="center" style="padding:6px 14px; border:1px solid #ddd;"><b>0.83</b>&nbsp;&#8288;|&#8288;&nbsp;0.74</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;"><ins>1.56</ins>&nbsp;&#8288;|&#8288;&nbsp;0.68</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;"><b>1.20</b>&nbsp;&#8288;|&#8288;&nbsp;0.71</td></tr>
-  </tbody>
-</table>
-
-</div>
-
 ### Instruct TTS
 
 <div align="center">
-
-<table style="border-collapse:collapse; margin:0 auto; text-align:center; white-space:nowrap;">
-  <thead>
-    <tr>
-      <th align="center" style="padding:6px 14px; border:1px solid #ddd; background-color:#f5f5f5;"><div align="center">Model</div></th>
-      <th align="center" style="padding:6px 14px; border:1px solid #ddd; background-color:#f5f5f5;"><div align="center">ZH<br>APS↑&nbsp;&#8288;|&#8288;&nbsp;DSD↑&nbsp;&#8288;|&#8288;&nbsp;RP↑</div></th>
-      <th align="center" style="padding:6px 14px; border:1px solid #ddd; background-color:#f5f5f5;"><div align="center">EN<br>APS↑&nbsp;&#8288;|&#8288;&nbsp;DSD↑&nbsp;&#8288;|&#8288;&nbsp;RP↑</div></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">VoiceSculptor-VD</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">74.6&nbsp;&#8288;|&#8288;&nbsp;63.5&nbsp;&#8288;|&#8288;&nbsp;62.0</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">–&nbsp;&#8288;|&#8288;&nbsp;–&nbsp;&#8288;|&#8288;&nbsp;–</td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">MOSS-VoiceGenerator</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">71.6&nbsp;&#8288;|&#8288;&nbsp;72.5&nbsp;&#8288;|&#8288;&nbsp;61.3</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">58.8&nbsp;&#8288;|&#8288;&nbsp;71.8&nbsp;&#8288;|&#8288;&nbsp;61.6</td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">Ming-Omni-TTS-16B</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">84.6&nbsp;&#8288;|&#8288;&nbsp;70.7&nbsp;&#8288;|&#8288;&nbsp;56.0</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">–&nbsp;&#8288;|&#8288;&nbsp;–&nbsp;&#8288;|&#8288;&nbsp;–</td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;">Qwen3-TTS-VD</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">83.7&nbsp;&#8288;|&#8288;&nbsp;81.7&nbsp;&#8288;|&#8288;&nbsp;65.8</td><td align="center" style="padding:6px 14px; border:1px solid #ddd;">76.4&nbsp;&#8288;|&#8288;&nbsp;81.4&nbsp;&#8288;|&#8288;&nbsp;64.2</td></tr>
-    <tr><td align="center" style="padding:6px 14px; border:1px solid #ddd;"><b>FireRedAudio</b></td><td align="center" style="padding:6px 14px; border:1px solid #ddd;"><b>86.0</b>&nbsp;&#8288;|&#8288;&nbsp;<b>84.1</b>&nbsp;&#8288;|&#8288;&nbsp;<b>70.1</b></td><td align="center" style="padding:6px 14px; border:1px solid #ddd;"><b>81.1</b>&nbsp;&#8288;|&#8288;&nbsp;<b>83.6</b>&nbsp;&#8288;|&#8288;&nbsp;<b>70.3</b></td></tr>
-  </tbody>
-</table>
-
-</div>
 
 * *These results are obtained from our own evaluation.*
 
@@ -636,121 +560,9 @@ uv run inference.py --task voice_design --model pretrained_models/FireRedAudio -
 
 <div align="center">
 
-<table align="center" style="border-collapse:collapse; margin:0 auto; text-align:center; white-space:nowrap;">
-  <thead>
-    <tr>
-      <th align="center" style="padding:4px 12px; border:1px solid #ddd;"><div align="center">Task</div></th>
-      <th align="center" style="padding:4px 12px; border:1px solid #ddd;"><div align="center">Setting</div></th>
-      <th align="center" style="padding:4px 12px; border:1px solid #ddd;"><div align="center">Metric</div></th>
-      <th align="center" style="padding:4px 12px; border:1px solid #ddd;"><div align="center">Ming-UniAudio-Edit<br>zh | en</div></th>
-      <th align="center" style="padding:4px 12px; border:1px solid #ddd;"><div align="center">FireRedAudio<br>zh | en</div></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;" rowspan="8"><b>Deletion</b></td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;" rowspan="4"><b>basic</b></td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;">WER (%)↓</td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;">11.89 | 14.85</td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>10.82</b> | <b>12.78</b></td>
-    </tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">SIM↑</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>0.78</b> | 0.76</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>0.78</b> | <b>0.79</b></td></tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">ACC (%)↑</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>100.00</b> | 82.22</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>100.00</b> | <b>97.78</b></td></tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">no-edit WER (%)↓</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;">11.49 | 24.26</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>10.70</b> | <b>23.16</b></td></tr>
-    <tr>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;" rowspan="4"><b>open</b></td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;">WER (%)↓</td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;">22.92 | 27.60</td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>10.49</b> | <b>16.65</b></td>
-    </tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">SIM↑</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>0.81</b> | 0.74</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;">0.80 | <b>0.80</b></td></tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">ACC (%)↑</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;">82.92 | 85.00</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>89.32</b> | <b>86.50</b></td></tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">no-edit WER (%)↓</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;">17.50 | 35.21</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>7.84</b> | <b>25.43</b></td></tr>
-    <tr>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;" rowspan="8"><b>Insertion</b></td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;" rowspan="4"><b>basic</b></td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;">WER (%)↓</td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;">3.42 | 6.63</td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>3.28</b> | <b>4.98</b></td>
-    </tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">SIM↑</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>0.83</b> | 0.79</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>0.83</b> | <b>0.84</b></td></tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">ACC (%)↑</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;">80.00 | 71.43</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>83.53</b> | <b>87.58</b></td></tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">no-edit WER (%)↓</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;">3.52 | 17.70</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>3.51</b> | <b>16.56</b></td></tr>
-    <tr>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;" rowspan="4"><b>open</b></td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;">WER (%)↓</td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;">3.89 | 7.59</td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>2.57</b> | <b>6.98</b></td>
-    </tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">SIM↑</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>0.83</b> | 0.79</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>0.83</b> | <b>0.84</b></td></tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">ACC (%)↑</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;">79.31 | 62.31</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>86.90</b> | <b>69.85</b></td></tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">no-edit WER (%)↓</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;">4.10 | 18.84</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>2.77</b> | <b>17.83</b></td></tr>
-    <tr>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;" rowspan="8"><b>Substitution</b></td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;" rowspan="4"><b>basic</b></td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;">WER (%)↓</td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;">4.52 | 8.99</td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>2.66</b> | <b>4.46</b></td>
-    </tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">SIM↑</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;">0.82 | 0.78</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>0.84</b> | <b>0.81</b></td></tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">ACC (%)↑</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;">78.62 | 59.78</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>87.42</b> | <b>75.98</b></td></tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">no-edit WER (%)↓</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;">4.63 | 19.28</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>2.91</b> | <b>16.34</b></td></tr>
-    <tr>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;" rowspan="4"><b>open</b></td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;">WER (%)↓</td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;">4.56 | 7.64</td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>2.45</b> | <b>4.41</b></td>
-    </tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">SIM↑</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;">0.83 | 0.77</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>0.84</b> | <b>0.81</b></td></tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">ACC (%)↑</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;">76.62 | 65.62</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>90.15</b> | <b>76.95</b></td></tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">no-edit WER (%)↓</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;">4.75 | 18.39</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>2.71</b> | <b>16.16</b></td></tr>
-  </tbody>
-</table>
-
-</div>
-
 ### Acoustic Editing
 
-
 <div align="center">
-
-<table style="border-collapse:collapse; margin:0 auto; text-align:center; white-space:nowrap;">
-  <thead>
-    <tr>
-      <th align="center" style="padding:4px 12px; border:1px solid #ddd;"><div align="center">Task</div></th>
-      <th align="center" style="padding:4px 12px; border:1px solid #ddd;"><div align="center">Metric</div></th>
-      <th align="center" style="padding:4px 12px; border:1px solid #ddd;"><div align="center">Ming-UniAudio-Edit<br>zh | en</div></th>
-      <th align="center" style="padding:4px 12px; border:1px solid #ddd;"><div align="center">FireRedAudio<br>zh | en</div></th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;" rowspan="3"><b>Speed Alteration</b></td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;">WER (%)↓</td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;">5.88 | 17.53</td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>2.00</b> | <b>4.43</b></td>
-    </tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">SIM↑</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;">0.66 | 0.57</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>0.79</b> | <b>0.71</b></td></tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">RDE (%)↓</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;">6.36 | 5.92</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>2.60</b> | <b>4.02</b></td></tr>
-    <tr>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;" rowspan="2"><b>Pitch Alteration</b></td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;">WER (%)↓</td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;">7.45 | 13.37</td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>2.00</b> | <b>3.04</b></td>
-    </tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">SIM↑</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;">0.36 | 0.24</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>0.52</b> | <b>0.44</b></td></tr>
-    <tr>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;" rowspan="3"><b>Volume Alteration</b></td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;">WER (%)↓</td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;">1.71 | 1.35</td>
-      <td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>1.60</b> | <b>1.30</b></td>
-    </tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">SIM↑</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;">0.86 | 0.80</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>0.94</b> | <b>0.93</b></td></tr>
-    <tr><td align="center" style="padding:4px 12px; border:1px solid #ddd;">RAE (%)↓</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;">14.90 | 11.70</td><td align="center" style="padding:4px 12px; border:1px solid #ddd;"><b>2.39</b> | <b>3.74</b></td></tr>
-  </tbody>
-</table>
-
-</div>
 
 ## Limitations
 

@@ -22,19 +22,19 @@ def save_wav(response: requests.Response, output_path: str) -> None:
 
 
 # ---- 1) Speech recognition (ASR) -----------------------------------------
-# started_at = time.perf_counter()
-# with open("assets/examples/asr_zh_fleurs.wav", "rb") as audio:
-#     response = requests.post(
-#         f"{BASE_URL}/v1/asr",
-#         files={"audio": audio},
-#         timeout=TIMEOUT,
-#     )
-# response.raise_for_status()
-# print("ASR:", response.json()["text"])
-# print_elapsed("ASR", started_at)
+started_at = time.perf_counter()
+with open("assets/examples/asr_zh_fleurs.wav", "rb") as audio:
+    response = requests.post(
+        f"{BASE_URL}/v1/asr",
+        files={"audio": audio},
+        timeout=TIMEOUT,
+    )
+response.raise_for_status()
+print("ASR:", response.json()["text"])
+print_elapsed("ASR", started_at)
 
 
-# ---- 2) Audio understanding ----------------------------------------------
+# ---- 2) Audio understanding (with optional chain-of-thought) --------------
 started_at = time.perf_counter()
 with open("assets/examples/two_speakers.wav", "rb") as audio:
     response = requests.post(
@@ -54,6 +54,24 @@ if understanding.get("reasoning"):
     print("Reasoning:", understanding["reasoning"])
 print_elapsed("Understanding", started_at)
 
+started_at = time.perf_counter()
+with open("assets/examples/assets_mmau_test.wav", "rb") as audio:
+    response = requests.post(
+        f"{BASE_URL}/v1/understand",
+        files={"audio": audio},
+        data={
+            "prompt": "What illness did Second speaker's friend suffer from?\n(A) Progressive arthritis (B) Progressive cancer (C) Acute pneumonia (D) Chronic heart disease",
+            "enable_thinking": "true",
+            "max_new_tokens": "10240",
+        },
+        timeout=TIMEOUT,
+    )
+response.raise_for_status()
+understanding = response.json()
+print("Understanding:", understanding["answer"])
+if understanding.get("reasoning"):
+    print("Reasoning:", understanding["reasoning"])
+print_elapsed("Understanding", started_at)
 
 # ---- 3) Zero-shot TTS (ICL voice cloning) ---------------------------------
 started_at = time.perf_counter()
