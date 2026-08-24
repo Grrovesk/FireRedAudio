@@ -11,6 +11,7 @@
     <a href="#"><img src="https://img.shields.io/badge/Paper-ArXiv-red" alt="technical report"></a>
     <a href="https://fireredteam.github.io/demos/fireredaudio/"><img src="https://img.shields.io/badge/Demo-Page-lightgrey" alt="version"></a>
     <a href="https://huggingface.co/FireRedTeam/FireRedAudio"><img src="https://img.shields.io/badge/Hugging%20Face-Model%20Page-yellow" alt="HF-model"></a>
+    <a href="https://www.modelscope.cn/models/FireRedTeam/FireRedAudio"><img src="https://img.shields.io/badge/ModelScope-Model%20Page-624AFF?logo=modelscope&logoColor=white" alt="ModelScope-model"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="Apache-2.0"></a>
 </div>
 
@@ -104,7 +105,13 @@ memory to load the original model before saving the quantized shards.
 Download the pretrained model from Hugging Face with the `hf` CLI:
 
 ```sh
-hf download FireRedTeam/FireRedAudio --local-dir pretrained_models/
+uv run hf download FireRedTeam/FireRedAudio --local-dir pretrained_models/
+```
+
+Alternatively, download the pretrained model using `modelscope` CLI:
+```
+uv pip install modelscope
+uv run modelscope download --model FireRedTeam/FireRedAudio --local_dir pretrained_models/
 ```
 
 ### Python API
