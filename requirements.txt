@@ -3,7 +3,7 @@ torchaudio==2.11.0
 torchcodec==0.16.0
 soundfile==0.13.1
 transformers==5.15.1
-numpy==2.5.2
+numpy==1.26.4
 einops==0.8.2
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
