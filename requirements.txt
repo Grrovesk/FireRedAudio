@@ -1,0 +1,25 @@
+torch==2.13.0
+torchaudio==2.11.0
+torchcodec==0.16.0
+soundfile==0.13.1
+transformers==5.15.1
+numpy==2.5.2
+einops==0.8.2
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+
+# Acceleration
+flash-linear-attention==0.5.2
+liger-kernel==0.8.2
+causal-conv1d==1.6.2.post1
+flash-attn==2.8.3
+
+# Quantization
+accelerate>=1.0.0
+bitsandbytes>=0.46.0
+
+# Tools
+tqdm==4.70.0
+
+# PyTorch CUDA 12.8
+--extra-index-url https://download.pytorch.org/whl/cu128
