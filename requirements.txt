@@ -8,10 +8,6 @@ einops==0.8.2
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 
-# Acceleration
-liger-kernel==0.8.2
-causal-conv1d==1.6.2.post1
-
 # Quantization
 accelerate>=1.0.0
 bitsandbytes>=0.46.0
