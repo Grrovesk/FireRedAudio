@@ -9,10 +9,8 @@ fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 
 # Acceleration
-flash-linear-attention==0.5.2
 liger-kernel==0.8.2
 causal-conv1d==1.6.2.post1
-flash-attn==2.8.3
 
 # Quantization
 accelerate>=1.0.0
